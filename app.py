@@ -22,7 +22,7 @@ BASE_EXCLUDE = [
     "0x8894e0a0c962cb723c1976a4421c95949be2d4e3", 
     "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c", 
     "0x10ed43c718714eb63d5aa57b78b54704e256024e", 
-    "0xdac17f958d2ee523a2206206994597c13d831ec7", # 新增: ERC USDT 合约地址防干扰
+    "0xdac17f958d2ee523a2206206994597c13d831ec7", 
 ]
 
 def load_cloud_blacklist():
@@ -64,10 +64,9 @@ with st.sidebar:
         st.session_state['authenticated'] = False
         st.rerun()
 
-# --- 新增了 tab_erc 分页 ---
 tab_trc, tab_bsc, tab_erc = st.tabs(["💎 TRC-20 批量穿透", "🔥 BSC 批量穿透", "⛓️ ERC-20 批量穿透"])
 
-# --- TRC 分页 (完全没动) ---
+# --- TRC 分页 ---
 with tab_trc:
     st.markdown("### ⚙️ TRC 配置")
     trc_days = st.number_input("分析时间范围 (限 1-30 天)：", min_value=1, max_value=30, value=7, key="td")
@@ -103,7 +102,7 @@ with tab_trc:
                 time.sleep(0.3)
             st.success("🏁 TRC 任务全部完成")
 
-# --- BSC 分页 (完全没动) ---
+# --- BSC 分页 ---
 with tab_bsc:
     st.markdown("### ⚙️ BSC 批量配置")
     bsc_limit = st.number_input("分析交易笔数 (限 1-100)：", min_value=1, max_value=100, value=50, step=1)
@@ -133,13 +132,9 @@ with tab_bsc:
                         
                         associated_set = set()
                         for tx in all_txs:
-                            # 🛡️ 容错保护：确保 value 和 decimals 存在
                             val_raw = tx.get("value")
                             dec_raw = tx.get("token_decimals")
-                            
-                            if val_raw is None: continue # 如果没金额，直接跳过
-                            
-                            # 转换逻辑：若精度不存在则默认为 18
+                            if val_raw is None: continue
                             try:
                                 actual_val = int(val_raw) / (10 ** int(dec_raw if dec_raw is not None else 18))
                             except:
@@ -160,10 +155,9 @@ with tab_bsc:
                 time.sleep(0.3)
             st.success("🏁 BSC 任务全部完成")
 
-# --- 新增的 ERC 分页 ---
+# --- ERC 分页 ---
 with tab_erc:
     st.markdown("### ⚙️ ERC 批量配置")
-    # Etherscan 接口支持一次性拉取，所以这里直接复用类似 BSC 的输入格式
     erc_limit = st.number_input("分析交易笔数 (限 1-500)：", min_value=1, max_value=500, value=50, step=1, key="erc_lim")
     erc_min_amount = st.number_input("过滤掉小于此金额的记录 (U)：", min_value=0.0, value=1.0, step=0.1, key="erc_min")
     erc_input = st.text_area("粘贴 ERC 目标地址 (一行一个):", height=180, key="ei")
@@ -177,7 +171,6 @@ with tab_erc:
             for target in targets:
                 with st.status(f"🎯 ERC 查询: {target}", expanded=True) as status:
                     try:
-                        # 呼叫 Etherscan Token Transfers 接口
                         url = f"https://api.etherscan.io/api?module=account&action=tokentx&address={target}&page=1&offset={safe_limit}&sort=desc&apikey={ETHERSCAN_API_KEY}"
                         r = requests.get(url).json()
                         
@@ -209,17 +202,18 @@ with tab_erc:
                             status.update(label=f"✅ 完成: {target}", state="complete")
                             
                         else:
-                            # 过滤掉查无数据的正常情况
+                            # === 就是这里升级了！让你能看到真正的死因 ===
                             if r.get("message") == "No transactions found":
                                 st.write("❌ 查无代币转移记录")
                                 status.update(label=f"✅ 完成: {target}", state="complete")
                             else:
-                                st.error(f"❌ API 报错: {r.get('message')}")
+                                real_error_reason = r.get("result", "未知错误")
+                                st.error(f"❌ Etherscan 拒绝请求: {real_error_reason}")
                                 status.update(label=f"❌ 失败: {target}", state="error")
                                 
                     except Exception as e: 
-                        st.error(f"❌ 错误 ({target}): {e}")
+                        st.error(f"❌ 程式崩溃 ({target}): {e}")
                         status.update(label=f"❌ 失败: {target}", state="error")
-                # 防封锁延迟
+                
                 time.sleep(0.3)
             st.success("🏁 ERC 任务全部完成")
