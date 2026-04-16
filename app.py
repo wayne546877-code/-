@@ -171,7 +171,8 @@ with tab_erc:
             for target in targets:
                 with st.status(f"🎯 ERC 查询: {target}", expanded=True) as status:
                     try:
-                        url = f"https://api.etherscan.io/api?module=account&action=tokentx&address={target}&page=1&offset={safe_limit}&sort=desc&apikey={ETHERSCAN_API_KEY}"
+                        # === 重点：这里换成了最新的 Etherscan V2 接口，并加了 chainid=1 ===
+                        url = f"https://api.etherscan.io/v2/api?chainid=1&module=account&action=tokentx&address={target}&page=1&offset={safe_limit}&sort=desc&apikey={ETHERSCAN_API_KEY}"
                         r = requests.get(url).json()
                         
                         if r.get("status") == "1":
@@ -202,7 +203,6 @@ with tab_erc:
                             status.update(label=f"✅ 完成: {target}", state="complete")
                             
                         else:
-                            # === 就是这里升级了！让你能看到真正的死因 ===
                             if r.get("message") == "No transactions found":
                                 st.write("❌ 查无代币转移记录")
                                 status.update(label=f"✅ 完成: {target}", state="complete")
