@@ -15,15 +15,25 @@ ETHERSCAN_API_KEY = "A71YIBIEZHTRR4669IS65A45QEFX24EY7N"
 
 ACCESS_PASSWORD = "0224"
 
-# 基础过滤名单
+# 基础过滤名单 (现在加入了大量 ERC 交易所地址)
 BASE_EXCLUDE = [
-    "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",         # TRC USDT
+    # --- 原有基础 ---
+    "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",         # TRC USDT 合约
     "T9yD14Nj9j7xMB4UXP2VJC2Bcg5NCtoL93",         # TRC 销毁地址
-    "0x55d398326f99059ff775485246999027b3197955", # BSC USDT
-    "0x8894e0a0c962cb723c1976a4421c95949be2d4e3", # BSC Binance
-    "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c", # BSC WBNB
-    "0x10ed43c718714eb63d5aa57b78b54704e256024e", # BSC PancakeSwap
-    "0xdac17f958d2ee523a2206206994597c13d831ec7", # ERC USDT
+    "0x55d398326f99059ff775485246999027b3197955", # BSC USDT 合约
+    "0x8894e0a0c962cb723c1976a4421c95949be2d4e3", # BSC Binance 热钱包
+    "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c", # BSC WBNB 合约
+    "0x10ed43c718714eb63d5aa57b78b54704e256024e", # BSC PancakeSwap 路由
+    "0xdac17f958d2ee523a2206206994597c13d831ec7", # ERC USDT 合约
+    # --- 新增: 以太坊 (ERC) 常见交易所热钱包 ---
+    "0x28c6c06298d514db089934071355e5743bf21d60", # ERC Binance 14
+    "0xf977814e90da44bfa03b6295a0616a897441acec", # ERC Binance 8
+    "0x2b5634c42055806a59e9107ed44d43c426e58258", # ERC KuCoin
+    "0x6cc5f688a315f3dc28a7781717a9a798a59fda7b", # ERC OKX
+    "0xa910f92acdaf488fa6ef02174fb86208ad7722ba", # ERC Huobi
+    "0x2910543af39aba0cd09dbb2d50200b3e800a63d0", # ERC Kraken
+    "0x7727e5113d1d161373623e5f49fd568b4f543a9e", # ERC Bitfinex
+    "0x0000000000000000000000000000000000000000", # 零地址 (销毁/伪造)
 ]
 
 def load_cloud_blacklist():
@@ -65,12 +75,9 @@ with st.sidebar:
         st.session_state['authenticated'] = False
         st.rerun()
 
-# 分页结构完全保留
 tab_trc, tab_bsc, tab_erc = st.tabs(["💎 TRC-20 批量穿透", "🔥 BSC 批量穿透", "⛓️ ERC-20 批量穿透"])
 
-# ==========================================
-# 💎 TRC 分页 (完全不变)
-# ==========================================
+# --- TRC 分页 ---
 with tab_trc:
     st.markdown("### ⚙️ TRC 配置")
     trc_days = st.number_input("分析时间范围 (限 1-30 天)：", min_value=1, max_value=30, value=7, key="td")
@@ -106,9 +113,7 @@ with tab_trc:
                 time.sleep(0.3)
             st.success("🏁 TRC 任务全部完成")
 
-# ==========================================
-# 🔥 BSC 分页 (完全不变)
-# ==========================================
+# --- BSC 分页 ---
 with tab_bsc:
     st.markdown("### ⚙️ BSC 批量配置")
     bsc_limit = st.number_input("分析交易笔数 (限 1-100)：", min_value=1, max_value=100, value=50, step=1)
@@ -161,9 +166,7 @@ with tab_bsc:
                 time.sleep(0.3)
             st.success("🏁 BSC 任务全部完成")
 
-# ==========================================
-# ⛓️ ERC 分页 (V2 接口 + 强制正版 USDT 过滤)
-# ==========================================
+# --- ERC 分页 ---
 with tab_erc:
     st.markdown("### ⚙️ ERC 批量配置")
     erc_limit = st.number_input("分析交易笔数 (限 1-500)：", min_value=1, max_value=500, value=50, step=1, key="erc_lim")
@@ -179,7 +182,6 @@ with tab_erc:
             for target in targets:
                 with st.status(f"🎯 ERC 查询: {target}", expanded=True) as status:
                     try:
-                        # === 重点更新：V2 接口 + contractaddress(官方USDT) 防垃圾币投毒 ===
                         url = f"https://api.etherscan.io/v2/api?chainid=1&module=account&action=tokentx&contractaddress=0xdac17f958d2ee523a2206206994597c13d831ec7&address={target}&page=1&offset={safe_limit}&sort=desc&apikey={ETHERSCAN_API_KEY}"
                         r = requests.get(url).json()
                         
@@ -211,13 +213,12 @@ with tab_erc:
                             status.update(label=f"✅ 完成: {target}", state="complete")
                             
                         else:
-                            # 明确显示具体的错误信息
                             if r.get("message") == "No transactions found":
                                 st.write("❌ 查无代币转移记录")
                                 status.update(label=f"✅ 完成: {target}", state="complete")
                             else:
                                 real_error_reason = r.get("result", "未知错误")
-                                st.error(f"❌ Etherscan 报错: {real_error_reason}")
+                                st.error(f"❌ Etherscan 拒绝请求: {real_error_reason}")
                                 status.update(label=f"❌ 失败: {target}", state="error")
                                 
                     except Exception as e: 
