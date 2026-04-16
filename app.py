@@ -15,14 +15,15 @@ ETHERSCAN_API_KEY = "A71YIBIEZHTRR4669IS65A45QEFX24EY7N"
 
 ACCESS_PASSWORD = "0224"
 
+# 基础过滤名单
 BASE_EXCLUDE = [
-    "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t", 
-    "T9yD14Nj9j7xMB4UXP2VJC2Bcg5NCtoL93", 
-    "0x55d398326f99059ff775485246999027b3197955", 
-    "0x8894e0a0c962cb723c1976a4421c95949be2d4e3", 
-    "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c", 
-    "0x10ed43c718714eb63d5aa57b78b54704e256024e", 
-    "0xdac17f958d2ee523a2206206994597c13d831ec7", 
+    "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",         # TRC USDT
+    "T9yD14Nj9j7xMB4UXP2VJC2Bcg5NCtoL93",         # TRC 销毁地址
+    "0x55d398326f99059ff775485246999027b3197955", # BSC USDT
+    "0x8894e0a0c962cb723c1976a4421c95949be2d4e3", # BSC Binance
+    "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c", # BSC WBNB
+    "0x10ed43c718714eb63d5aa57b78b54704e256024e", # BSC PancakeSwap
+    "0xdac17f958d2ee523a2206206994597c13d831ec7", # ERC USDT
 ]
 
 def load_cloud_blacklist():
@@ -64,9 +65,12 @@ with st.sidebar:
         st.session_state['authenticated'] = False
         st.rerun()
 
+# 分页结构完全保留
 tab_trc, tab_bsc, tab_erc = st.tabs(["💎 TRC-20 批量穿透", "🔥 BSC 批量穿透", "⛓️ ERC-20 批量穿透"])
 
-# --- TRC 分页 ---
+# ==========================================
+# 💎 TRC 分页 (完全不变)
+# ==========================================
 with tab_trc:
     st.markdown("### ⚙️ TRC 配置")
     trc_days = st.number_input("分析时间范围 (限 1-30 天)：", min_value=1, max_value=30, value=7, key="td")
@@ -102,7 +106,9 @@ with tab_trc:
                 time.sleep(0.3)
             st.success("🏁 TRC 任务全部完成")
 
-# --- BSC 分页 ---
+# ==========================================
+# 🔥 BSC 分页 (完全不变)
+# ==========================================
 with tab_bsc:
     st.markdown("### ⚙️ BSC 批量配置")
     bsc_limit = st.number_input("分析交易笔数 (限 1-100)：", min_value=1, max_value=100, value=50, step=1)
@@ -155,7 +161,9 @@ with tab_bsc:
                 time.sleep(0.3)
             st.success("🏁 BSC 任务全部完成")
 
-# --- ERC 分页 ---
+# ==========================================
+# ⛓️ ERC 分页 (V2 接口 + 强制正版 USDT 过滤)
+# ==========================================
 with tab_erc:
     st.markdown("### ⚙️ ERC 批量配置")
     erc_limit = st.number_input("分析交易笔数 (限 1-500)：", min_value=1, max_value=500, value=50, step=1, key="erc_lim")
@@ -171,8 +179,8 @@ with tab_erc:
             for target in targets:
                 with st.status(f"🎯 ERC 查询: {target}", expanded=True) as status:
                     try:
-                        # === 重点：这里换成了最新的 Etherscan V2 接口，并加了 chainid=1 ===
-                        url = f"https://api.etherscan.io/v2/api?chainid=1&module=account&action=tokentx&address={target}&page=1&offset={safe_limit}&sort=desc&apikey={ETHERSCAN_API_KEY}"
+                        # === 重点更新：V2 接口 + contractaddress(官方USDT) 防垃圾币投毒 ===
+                        url = f"https://api.etherscan.io/v2/api?chainid=1&module=account&action=tokentx&contractaddress=0xdac17f958d2ee523a2206206994597c13d831ec7&address={target}&page=1&offset={safe_limit}&sort=desc&apikey={ETHERSCAN_API_KEY}"
                         r = requests.get(url).json()
                         
                         if r.get("status") == "1":
@@ -203,12 +211,13 @@ with tab_erc:
                             status.update(label=f"✅ 完成: {target}", state="complete")
                             
                         else:
+                            # 明确显示具体的错误信息
                             if r.get("message") == "No transactions found":
                                 st.write("❌ 查无代币转移记录")
                                 status.update(label=f"✅ 完成: {target}", state="complete")
                             else:
                                 real_error_reason = r.get("result", "未知错误")
-                                st.error(f"❌ Etherscan 拒绝请求: {real_error_reason}")
+                                st.error(f"❌ Etherscan 报错: {real_error_reason}")
                                 status.update(label=f"❌ 失败: {target}", state="error")
                                 
                     except Exception as e: 
